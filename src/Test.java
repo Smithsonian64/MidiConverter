@@ -44,6 +44,8 @@ public class Test {
         System.out.println(sequence.getResolution());
         float PPQ = sequence.getResolution();
         long tempo = 120;
+        double currentTime;
+        double lastTime = 0;
 
         int trackNumber = 0;
         for (Track track :  sequence.getTracks()) {
@@ -64,12 +66,28 @@ public class Test {
                         String noteName = NOTE_NAMES[note];
                         int velocity = sm.getData2();
                                                                     //beats per minute go here\/
-                        times.get(trackNumber - 1).add((double) event.getTick() * (60000f / (tempo * PPQ)) / 1000f);
+                        currentTime = (double) (event.getTick() * (60000f / (tempo * PPQ)) / 1000f);
+                        times.get(trackNumber - 1).add(currentTime);
+
 
                         if(note <= 2) types.get(trackNumber - 1).add(0);
                         else if(note > 2 && note <= 5) types.get(trackNumber - 1).add(1);
                         else if(note > 5 && note  <= 8) types.get(trackNumber - 1).add(2);
                         else if(note > 8) types.get(trackNumber - 1).add(3);
+
+                        if(currentTime <= lastTime + 0.1 && types.get(trackNumber - 1).size() > 1) {
+                            if(types.get(trackNumber - 1).get(types.get(trackNumber - 1).size() - 1) ==
+                                    types.get(trackNumber - 1).get(types.get(trackNumber - 1).size() - 2)) {
+                                System.out.println("two notes with same time");
+                                if(types.get(trackNumber - 1).get(types.get(trackNumber - 1).size() - 1) == 3) {
+                                    types.get(trackNumber - 1).set(types.get(trackNumber - 1).size() - 1, 0);
+                                } else {
+                                    types.get(trackNumber - 1).set(types.get(trackNumber - 1).size() - 1, types.get(trackNumber - 1).get(types.get(trackNumber - 1).size() - 1) + 1);
+                                }
+                            }
+                        }
+
+                        lastTime = currentTime;
 
                         System.out.println("Note on, " + noteName + octave + " key=" + key + " velocity: " + velocity);
                     } else if (sm.getCommand() == NOTE_OFF) {
@@ -102,7 +120,7 @@ public class Test {
                     else if(mm.getType() == 0x58) System.out.println("Meta message, time signature: " + Arrays.toString(byteToHex(mm.getMessage())));
                     else if(mm.getType() == 0x59) System.out.println("Meta message, key signature: " + Arrays.toString(byteToHex(mm.getMessage())));
                     else if(mm.getType() == 0x7F) System.out.println("Meta message, Sequencer Specific Meta-Event: " + Arrays.toString(byteToHex(mm.getMessage())));
-                    else System.out.println("Meta message, unknown message");
+                    else System.out.println("Meta message, unknown message, message type: " + mm.getType() + ", raw message: " + mm.getMessage());
                 } else {
                     System.out.println("Other message: " + message.getClass());
                 }
