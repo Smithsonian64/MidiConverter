@@ -1,15 +1,19 @@
+/**
+ *
+ *
+ *
+ * @author Michael Smith
+ */
+
 import java.io.File;
 import java.io.FileWriter;
 import java.lang.constant.DynamicConstantDesc;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
+import java.util.Scanner;
 
-import javax.sound.midi.MidiEvent;
-import javax.sound.midi.MidiMessage;
-import javax.sound.midi.MidiSystem;
-import javax.sound.midi.Sequence;
-import javax.sound.midi.ShortMessage;
-import javax.sound.midi.Track;
+import javax.sound.midi.*;
 
 public class Test {
     public static final int NOTE_ON = 0x90;
@@ -17,6 +21,8 @@ public class Test {
     public static final String[] NOTE_NAMES = {"C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"};
 
     public static void main(String[] args) throws Exception {
+
+        Scanner scan = new Scanner(System.in);
 
         ArrayList<ArrayList<Double>> times = new ArrayList<>();
         for(int i = 0; i < 2; i++) times.add(new ArrayList<>());
@@ -26,11 +32,18 @@ public class Test {
 
         ArrayList<Double> allTimes = new ArrayList<>();
         ArrayList<Integer> allTypes = new ArrayList<>();
+        System.out.println("Please input file name\ninclude path if not in source directory: ");
+        String inputFile = scan.nextLine();
+        System.out.println("Please input output file name\nThe file will be placed in source directory: ");
+        String outputFile = scan.nextLine();
 
-        Sequence sequence = MidiSystem.getSequence(new File("TTFATFMIDI.mid"));
+        Sequence sequence = MidiSystem.getSequence(new File(inputFile));
 
         System.out.println(sequence.getTracks().length);
 
+        System.out.println(sequence.getResolution());
+        float PPQ = sequence.getResolution();
+        long tempo = 120;
 
         int trackNumber = 0;
         for (Track track :  sequence.getTracks()) {
@@ -50,8 +63,8 @@ public class Test {
                         int note = key % 12;
                         String noteName = NOTE_NAMES[note];
                         int velocity = sm.getData2();
-                                                                   //beats per minute go here\/
-                        times.get(trackNumber - 1).add((double) event.getTick() * (60000f / (180f * 480f)) / 1000f);
+                                                                    //beats per minute go here\/
+                        times.get(trackNumber - 1).add((double) event.getTick() * (60000f / (tempo * PPQ)) / 1000f);
 
                         if(note <= 2) types.get(trackNumber - 1).add(0);
                         else if(note > 2 && note <= 5) types.get(trackNumber - 1).add(1);
@@ -69,6 +82,27 @@ public class Test {
                     } else {
                         System.out.println("Command:" + sm.getCommand());
                     }
+                } else if(message instanceof javax.sound.midi.MetaMessage){
+                    MetaMessage mm = (MetaMessage) message;
+                    if(mm.getType() == 0x00) System.out.println("Meta message, sequence number: " + Arrays.toString(byteToHex(mm.getMessage())));
+                    else if(mm.getType() >= 0x01 && mm.getType() <= 0x0f) System.out.println("Meta message, text Event: " + Arrays.toString(byteToHex(mm.getMessage())));
+                    else if(mm.getType() == 0x20) System.out.println("Meta message, MIDI channel prefix: " + Arrays.toString(byteToHex(mm.getMessage())));
+                    else if(mm.getType() == 0x2f) System.out.println("Meta message, end of track " + trackNumber + ": " + Arrays.toString(byteToHex(mm.getMessage())));
+                    else if(mm.getType() == 0x51) {
+                        String[] hexValues = byteToHex(mm.getMessage());
+                        String mSPQ = "";
+                        System.out.println("Meta message, set Tempo: " + Arrays.toString(hexValues));
+                        for(int j = 3; j < hexValues.length; j++) {
+                            mSPQ += hexValues[j];
+                        }
+                        long sPQ = Long.parseLong(mSPQ, 16);
+                        tempo = (long) (60 / (sPQ / (double) 1000000));
+                    }
+                    else if(mm.getType() == 0x54) System.out.println("Meta message, SMPTE Offset: " + Arrays.toString(byteToHex(mm.getMessage())));
+                    else if(mm.getType() == 0x58) System.out.println("Meta message, time signature: " + Arrays.toString(byteToHex(mm.getMessage())));
+                    else if(mm.getType() == 0x59) System.out.println("Meta message, key signature: " + Arrays.toString(byteToHex(mm.getMessage())));
+                    else if(mm.getType() == 0x7F) System.out.println("Meta message, Sequencer Specific Meta-Event: " + Arrays.toString(byteToHex(mm.getMessage())));
+                    else System.out.println("Meta message, unknown message");
                 } else {
                     System.out.println("Other message: " + message.getClass());
                 }
@@ -86,29 +120,17 @@ public class Test {
             }
         }
 
-        int cursor = 0;
-        int sortedIndex = 0;
-        int smallestIndex = 0;
-        double smallest = 0;
-
-        double tempTime = 0;
-        int tempType = 0;
 
         insertionSortImperative(allTimes, allTypes);
 
-        FileWriter writer = new FileWriter("TTFATFDef.txt");
+        FileWriter writer = new FileWriter(outputFile);
 
 
         for(int i = 0; i < allTimes.size(); i++) {
             writer.write(allTimes.get(i) + ", " + allTypes.get(i) + "\n");
         }
 
-        /*for(int i = 0; i < sequence.getTracks().length; i++) {
-            for(int j = 0; j < times.get(i).size(); j++) {
-                writer.write(times.get(i).get(j) + ", " + types.get(i).get(j) + "\n");
-                //System.out.println("track: " + (i + 1) + ", time: " + times.get(i).get(j) + ", type: " + types.get(i).get(j));
-            }
-        }*/
+
         writer.close();
     }
 
@@ -125,6 +147,21 @@ public class Test {
             input.set(j + 1, key);
             types.set(j + 1, tkey);
         }
+    }
+
+    public static String[] byteToHex(byte[] nums) {
+        char hexDigit1;
+        char hexDigit2;
+        String[] output = new String[nums.length];
+        for(int i = 0; i < nums.length; i++) {
+            hexDigit1 = Character.forDigit((nums[i] >> 4) & 0xF, 16);
+            hexDigit2 = Character.forDigit((nums[i] & 0xF), 16);
+            output[i] = hexDigit1 + "" + hexDigit2;
+            output[i] = output[i].toUpperCase();
+        }
+
+        return output;
+
     }
 
 }
