@@ -32,20 +32,27 @@ public class Test {
 
         ArrayList<Double> allTimes = new ArrayList<>();
         ArrayList<Integer> allTypes = new ArrayList<>();
+        /*
         System.out.println("Please input file name\ninclude path if not in source directory: ");
         String inputFile = scan.nextLine();
         System.out.println("Please input output file name\nThe file will be placed in source directory: ");
-        String outputFile = scan.nextLine();
+        String outputFile = scan.nextLine();*/
+        String inputFile = "velocitytest.mid";
+        String outputFile = "vtDef.txt";
 
         Sequence sequence = MidiSystem.getSequence(new File(inputFile));
 
-        System.out.println(sequence.getTracks().length);
+        System.out.println("Num of tracks: " + sequence.getTracks().length);
 
-        System.out.println(sequence.getResolution());
+        System.out.println("PPQ: " + sequence.getResolution());
+
+        System.out.println("Division type: " + sequence.getDivisionType());
+
         float PPQ = sequence.getResolution();
         long tempo = 120;
         double currentTime;
         double lastTime = 0;
+        //double timeBetweenQs =
 
         int trackNumber = 0;
         for (Track track :  sequence.getTracks()) {
@@ -56,6 +63,20 @@ public class Test {
                 MidiEvent event = track.get(i);
                 System.out.print("@" + event.getTick() + " ");
                 MidiMessage message = event.getMessage();
+                if(message instanceof javax.sound.midi.MetaMessage) {
+                    MetaMessage m = (MetaMessage) message;
+                    if(m.getType() == 0x51) {
+                        String[] hexValues = byteToHex(m.getMessage());
+                        String mSPQ = "";
+                        System.out.print("Meta message, set Tempo: " + Arrays.toString(hexValues));
+                        for(int j = 3; j < hexValues.length; j++) {
+                            mSPQ += hexValues[j];
+                        }
+                        long sPQ = Long.parseLong(mSPQ, 16);
+                        tempo = (long) (60 / (sPQ / (double) 1000000));
+                        System.out.println("Set tempo to: " + tempo + " BPM");
+                    }
+                }
                 if (message instanceof ShortMessage) {
                     ShortMessage sm = (ShortMessage) message;
                     System.out.print("Channel: " + sm.getChannel() + " ");
@@ -68,6 +89,8 @@ public class Test {
                                                                     //beats per minute go here\/
                         currentTime = (double) (event.getTick() * (60000f / (tempo * PPQ)) / 1000f);
                         times.get(trackNumber - 1).add(currentTime);
+                        //System.out.println("I see at tick " + event.getTick() + " and am inserting " + currentTime);
+                        //System.out.println("because my PPQ is " + PPQ + ", my tempo is " + tempo + ", and my ticks are " + event.getTick());
 
 
                         if(note <= 2) types.get(trackNumber - 1).add(0);
@@ -75,7 +98,7 @@ public class Test {
                         else if(note > 5 && note  <= 8) types.get(trackNumber - 1).add(2);
                         else if(note > 8) types.get(trackNumber - 1).add(3);
 
-                        if(currentTime <= lastTime + 0.1 && types.get(trackNumber - 1).size() > 1) {
+                        /*if(currentTime <= lastTime + 0.1 && types.get(trackNumber - 1).size() > 1) {
                             if(types.get(trackNumber - 1).get(types.get(trackNumber - 1).size() - 1) ==
                                     types.get(trackNumber - 1).get(types.get(trackNumber - 1).size() - 2)) {
                                 System.out.println("two notes with same time");
@@ -85,7 +108,7 @@ public class Test {
                                     types.get(trackNumber - 1).set(types.get(trackNumber - 1).size() - 1, types.get(trackNumber - 1).get(types.get(trackNumber - 1).size() - 1) + 1);
                                 }
                             }
-                        }
+                        }*/
 
                         lastTime = currentTime;
 
@@ -103,10 +126,13 @@ public class Test {
                 } else if(message instanceof javax.sound.midi.MetaMessage){
                     MetaMessage mm = (MetaMessage) message;
                     if(mm.getType() == 0x00) System.out.println("Meta message, sequence number: " + Arrays.toString(byteToHex(mm.getMessage())));
-                    else if(mm.getType() >= 0x01 && mm.getType() <= 0x0f) System.out.println("Meta message, text Event: " + Arrays.toString(byteToHex(mm.getMessage())));
+                    else if(mm.getType() >= 0x01 && mm.getType() <= 0x0f) {
+                        System.out.println("Meta message, text Event: " + Arrays.toString(byteToHex(mm.getMessage())));
+                        System.out.println(mm.getMessage());
+                    }
                     else if(mm.getType() == 0x20) System.out.println("Meta message, MIDI channel prefix: " + Arrays.toString(byteToHex(mm.getMessage())));
                     else if(mm.getType() == 0x2f) System.out.println("Meta message, end of track " + trackNumber + ": " + Arrays.toString(byteToHex(mm.getMessage())));
-                    else if(mm.getType() == 0x51) {
+                    else if(mm.getType() == 0x51); /*{
                         String[] hexValues = byteToHex(mm.getMessage());
                         String mSPQ = "";
                         System.out.println("Meta message, set Tempo: " + Arrays.toString(hexValues));
@@ -115,7 +141,7 @@ public class Test {
                         }
                         long sPQ = Long.parseLong(mSPQ, 16);
                         tempo = (long) (60 / (sPQ / (double) 1000000));
-                    }
+                    }*/
                     else if(mm.getType() == 0x54) System.out.println("Meta message, SMPTE Offset: " + Arrays.toString(byteToHex(mm.getMessage())));
                     else if(mm.getType() == 0x58) System.out.println("Meta message, time signature: " + Arrays.toString(byteToHex(mm.getMessage())));
                     else if(mm.getType() == 0x59) System.out.println("Meta message, key signature: " + Arrays.toString(byteToHex(mm.getMessage())));
@@ -141,6 +167,9 @@ public class Test {
 
         insertionSortImperative(allTimes, allTypes);
 
+        while(checkForOverlaps(allTimes, allTypes));
+
+
         FileWriter writer = new FileWriter(outputFile);
 
 
@@ -165,6 +194,23 @@ public class Test {
             input.set(j + 1, key);
             types.set(j + 1, tkey);
         }
+    }
+
+    public static boolean checkForOverlaps(ArrayList<Double> allTimes, ArrayList<Integer> allTypes) {
+        boolean madeASwitch = false;
+        for(int i = 1; i < allTimes.size(); i++) {
+            if(i < 4) continue;
+            for(int j = 1; j < 4; j++) {
+                if(allTimes.get(i - j) + 0.1 >= allTimes.get(i) &&
+                allTypes.get(i - j) == allTypes.get(i)) {
+                    madeASwitch = true;
+                    if(allTypes.get(i) == 3) allTypes.set(i, 0);
+                    else allTypes.set(i, allTypes.get(i) + 1);
+                }
+            }
+
+        }
+        return madeASwitch;
     }
 
     public static String[] byteToHex(byte[] nums) {
