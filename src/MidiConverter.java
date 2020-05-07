@@ -15,7 +15,7 @@ import java.util.Scanner;
 
 import javax.sound.midi.*;
 
-public class Test {
+public class MidiConverter {
     public static final int NOTE_ON = 0x90;
     public static final int NOTE_OFF = 0x80;
     public static final String[] NOTE_NAMES = {"C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"};
@@ -32,13 +32,13 @@ public class Test {
 
         ArrayList<Double> allTimes = new ArrayList<>();
         ArrayList<Integer> allTypes = new ArrayList<>();
-        /*
+
         System.out.println("Please input file name\ninclude path if not in source directory: ");
         String inputFile = scan.nextLine();
         System.out.println("Please input output file name\nThe file will be placed in source directory: ");
-        String outputFile = scan.nextLine();*/
-        String inputFile = "velocitytest.mid";
-        String outputFile = "vtDef.txt";
+        String outputFile = scan.nextLine();
+        /*String inputFile = "velocitytest.mid";
+        String outputFile = "vtDef.txt";*/
 
         Sequence sequence = MidiSystem.getSequence(new File(inputFile));
 
